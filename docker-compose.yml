@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: muduck_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=muduck_db
+      - POSTGRES_USER=muduck_user
+      - POSTGRES_PASSWORD=muduck_pw
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:latest
+    container_name: muduck_redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
