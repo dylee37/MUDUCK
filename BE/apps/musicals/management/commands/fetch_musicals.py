@@ -1,4 +1,8 @@
-# KOPIS에서 데이터 구축 (2024~2026, 대학로 및 소극장 일단 제외)
+# KOPIS에서 뮤지컬 정보를 가져옴
+# 기간: 20240101~20261231
+# 장르: 뮤지컬
+# 특성: 대학로, 뮤지컬 라이센스, 뮤지컬 창작, 수상작 (아동, 축제 제외)
+# 좌석: 300석 이상
 
 import os
 import time
@@ -12,68 +16,78 @@ from dotenv import load_dotenv
 load_dotenv() 
 
 class Command(BaseCommand):
-    help = '2024~2026년 KOPIS 뮤지컬 데이터를 전체 수집합니다.'
+    help = '아동극/축제를 제외한 300석 이상의 뮤지컬 데이터를 수집합니다.'
 
     def handle(self, *args, **options):
         API_KEY = os.getenv('KOPIS_API')
-        if not API_KEY:
-            self.stdout.write(self.style.ERROR("API 키 누락"))
-            return
-
-        # 수집 기간 설정 (24년 ~ 26년)
         STDATE = "20240101" 
         EDDATE = "20261231" 
-        cpage = 1 # 1페이지부터 시작
+        cpage = 1
 
-        self.stdout.write(f"{STDATE} ~ {EDDATE} 기간 데이터 수집 시작...")
+        self.stdout.write(f"수집 시작: {STDATE} ~ {EDDATE} (아동/축제 제외, 300석 이상)")
 
         while True:
-            # rows=100으로 한 번에 많이 가져오기 (1초당 10회 제한 안 걸리게 효율화)
-            URL = f"http://www.kopis.or.kr/openApi/restful/pblprfr?service={API_KEY}&stdate={STDATE}&eddate={EDDATE}&shcate=GGGA&rows=100&cpage={cpage}"
+            list_url = f"http://www.kopis.or.kr/openApi/restful/pblprfr?service={API_KEY}&stdate={STDATE}&eddate={EDDATE}&shcate=GGGA&rows=100&cpage={cpage}"
             
             try:
-                response = requests.get(URL)
-                data_dict = xmltodict.parse(response.content)
+                res = requests.get(list_url)
+                data_dict = xmltodict.parse(res.content)
                 
-                # 데이터가 더 이상 없으면 루프 종료
                 if 'dbs' not in data_dict or not data_dict['dbs']:
-                    self.stdout.write(self.style.SUCCESS(f"모든 수집 완료! 최종 페이지: {cpage-1}"))
                     break
 
                 items = data_dict['dbs']['db']
                 if isinstance(items, dict): items = [items]
 
                 for item in items:
-                    # [필터링 예시] 대학로 제외 로직을 넣고 싶다면?
-                    # 공연장 이름에 '대학로'가 포함되어 있으면 건너뛰기
-                    if "대학로" in item['fcltynm']:
-                        continue
-
-                    # 공연장 저장
-                    venue, _ = Venue.objects.get_or_create(
-                        kopis_id=item['fcltynm'], 
-                        defaults={'name': item['fcltynm']}
-                    )
-
-                    # 뮤지컬 저장 (이미 있으면 Pass, 없으면 Create)
-                    musical, created = Musical.objects.get_or_create(
-                        kopis_id=item['mt20id'],
-                        defaults={
-                            'title': item['prfnm'],
-                            'poster_url': item['poster'],
-                            'start_date': datetime.strptime(item['prfpdfrom'], '%Y.%m.%d').date(),
-                            'end_date': datetime.strptime(item['prfpdto'], '%Y.%m.%d').date(),
-                            'venue': venue,
-                        }
-                    )
+                    mt20id = item['mt20id']
+                    detail_url = f"http://www.kopis.or.kr/openApi/restful/pblprfr/{mt20id}?service={API_KEY}"
                     
-                    if created:
-                        self.stdout.write(f"신규 추가: {musical.title}")
+                    time.sleep(0.12) # 1초당 10회 제한 준수
+                    detail_res = requests.get(detail_url)
+                    detail_data = xmltodict.parse(detail_res.content)
+                    
+                    if 'dbs' in detail_data and 'db' in detail_data['dbs']:
+                        info = detail_data['dbs']['db']
+                        
+                        # --- [필터링 로직 시작] ---
+                        
+                        # 1. 아동용 공연 제외 (info['kids']가 'Y'이면 건너뜀)
+                        if info.get('kids') == 'Y':
+                            continue
+                            
+                        # 2. 축제 제외 (info['festival']이 'Y'이면 건너뜀)
+                        if info.get('festival') == 'Y':
+                            continue
 
-                # KOPIS 1초당 10회 호출 제한 준수 (0.2초 대기)
-                time.sleep(0.2)
-                cpage += 1 # 다음 페이지로 이동
+                        # 3. 좌석수 300석 이상 필터링
+                        seats = int(info.get('pcseast', 0) or 0)
+                        if seats < 300:
+                            continue
+                        
+                        # --- [필터링 로직 끝] ---
+
+                        venue, _ = Venue.objects.get_or_create(
+                            kopis_id=info['fcltynm'], 
+                            defaults={'name': info['fcltynm']}
+                        )
+
+                        musical, created = Musical.objects.get_or_create(
+                            kopis_id=mt20id,
+                            defaults={
+                                'title': info['prfnm'],
+                                'poster_url': info['poster'],
+                                'start_date': datetime.strptime(info['prfpdfrom'], '%Y.%m.%d').date(),
+                                'end_date': datetime.strptime(info['prfpdto'], '%Y.%m.%d').date(),
+                                'venue': venue,
+                            }
+                        )
+
+                        if created:
+                            self.stdout.write(f"추가 완료: {info['prfnm']} ({seats}석)")
+
+                cpage += 1 
 
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"에러 발생: {e}"))
+                self.stdout.write(self.style.ERROR(f"에러: {e}"))
                 break
