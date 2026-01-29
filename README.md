@@ -13,7 +13,7 @@
 [![My Skills](https://skillicons.dev/icons?i=django&perline=4)](https://skillicons.dev)
 
 **Frontend**<br>
-[![My Skills](https://skillicons.dev/icons?i=vue,vite,css,figma&perline=4)](https://skillicons.dev)
+[![My Skills](https://skillicons.dev/icons?i=vue,vite,nodejs,figma&perline=4)](https://skillicons.dev)
 
 **Database**<br>
 [![My Skills](https://skillicons.dev/icons?i=postgresql&perline=4)](https://skillicons.dev)
