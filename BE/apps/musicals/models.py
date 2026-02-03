@@ -23,6 +23,10 @@ class Musical(models.Model):
     start_date = models.DateField() # 공연 시작일 (예: 2024-01-01)
     end_date = models.DateField()   # 공연 종료일 (예: 2024-03-31)
     venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name='musicals')
+    actors = models.ManyToManyField('Actor', related_name='musicals', blank=True) # 뮤지컬 참여 배우진
+
+    def __str__(self):
+        return self.title
 
 # 4. 공연 회차 정보 (핵심: "오늘 누가 나오나?")
 class Performance(models.Model):
