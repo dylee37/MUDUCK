@@ -8,12 +8,14 @@ class Venue(models.Model):
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
 
-# 2. 배우 정보 (인물 도감)
 class Actor(models.Model):
     name = models.CharField(max_length=100)
-    source_id = models.CharField(max_length=50, unique=True, null=True, blank=True) # PlayDB 고유번호
-    profile_img = models.URLField(blank=True, null=True) # 배우 얼굴 사진
-    external_link = models.URLField(blank=True, null=True) # 배우 상세페이지 링크
+    # PlayDB ID를 기준으로 unique를 걸어 중복 생성을 막습니다.
+    source_id = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    profile_img = models.URLField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name
 
 # 3. 뮤지컬 작품 정보 (대주제)
 class Musical(models.Model):
