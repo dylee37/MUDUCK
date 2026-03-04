@@ -1,1 +1,0 @@
-실제 페이지 단위 (Home, Calendar, Search ...)
